@@ -1,423 +1,232 @@
-// --- THREE.JS 3D BACKGROUND ---
-let scene, camera, renderer, particles, particleSystem, icosahedron;
+// ================= THREE.JS BACKGROUND =================
+let scene, camera, renderer, particleSystem, icosahedron;
 
 function initThreeJS() {
-    // Scene
+    const canvas = document.getElementById('threejs-canvas');
+    if (!canvas || !window.THREE) return;
+
     scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x000010, 0.001);
 
-    // Camera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+    );
     camera.position.z = 50;
 
-    // Renderer
-    renderer = new THREE.WebGLRenderer({ 
-        canvas: document.getElementById('threejs-canvas'),
+    renderer = new THREE.WebGLRenderer({
+        canvas,
         alpha: true,
-        antialias: true 
+        antialias: true
     });
+
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // Create particle system
-    const particleCount = 2000;
-    const particles = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
+    // Particles
+    const count = 1500;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
 
-    for (let i = 0; i < particleCount * 3; i += 3) {
-        // Positions
+    for (let i = 0; i < count * 3; i += 3) {
         positions[i] = (Math.random() - 0.5) * 200;
         positions[i + 1] = (Math.random() - 0.5) * 200;
         positions[i + 2] = (Math.random() - 0.5) * 200;
 
-        // Colors
-        const color = new THREE.Color();
-        color.setHSL(Math.random(), 1.0, 0.7);
-        colors[i] = color.r;
-        colors[i + 1] = color.g;
-        colors[i + 2] = color.b;
+        const c = new THREE.Color().setHSL(Math.random(), 1, 0.7);
+        colors[i] = c.r;
+        colors[i + 1] = c.g;
+        colors[i + 2] = c.b;
     }
 
-    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    // Material
-    const particleMaterial = new THREE.PointsMaterial({
+    const material = new THREE.PointsMaterial({
         size: 0.5,
         vertexColors: true,
         transparent: true,
         opacity: 0.6
     });
 
-    // Particle system
-    particleSystem = new THREE.Points(particles, particleMaterial);
+    particleSystem = new THREE.Points(geometry, material);
     scene.add(particleSystem);
 
-    // Add some 3D objects
-    const geometry = new THREE.IcosahedronGeometry(10, 0);
-    const material = new THREE.MeshBasicMaterial({ 
-        color: 0x00f3ff, 
+    // Icosahedron
+    const icoGeo = new THREE.IcosahedronGeometry(10, 0);
+    const icoMat = new THREE.MeshBasicMaterial({
+        color: 0x00f3ff,
         wireframe: true,
         transparent: true,
-        opacity: 0.2
+        opacity: 0.25
     });
-    icosahedron = new THREE.Mesh(geometry, material);
+
+    icosahedron = new THREE.Mesh(icoGeo, icoMat);
     icosahedron.position.set(20, 10, -50);
     scene.add(icosahedron);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x00f3ff, 0.1);
-    scene.add(ambientLight);
-
-    const pointLight = new THREE.PointLight(0xff00ff, 0.5);
-    pointLight.position.set(50, 50, 50);
-    scene.add(pointLight);
-
-    // Animation
     function animate() {
         requestAnimationFrame(animate);
-        
-        particleSystem.rotation.x += 0.0005;
-        particleSystem.rotation.y += 0.001;
-        
-        icosahedron.rotation.x += 0.005;
-        icosahedron.rotation.y += 0.005;
-        
+        particleSystem.rotation.y += 0.0006;
+        icosahedron.rotation.x += 0.004;
+        icosahedron.rotation.y += 0.004;
         renderer.render(scene, camera);
     }
 
     animate();
 
-    // Handle window resize
-    window.addEventListener('resize', onWindowResize);
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-// --- MATRIX RAIN EFFECT ---
-let matrixChars = "01ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
+// ================= MATRIX EFFECT =================
+const matrixChars =
+    "01ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%";
 
 function createMatrixRain() {
     const container = document.getElementById('matrix');
-    const charCount = 80; // Reduced for better performance
-    
-    for (let i = 0; i < charCount; i++) {
-        const char = document.createElement('div');
-        char.className = 'matrix-char';
-        char.textContent = matrixChars[Math.floor(Math.random() * matrixChars.length)];
-        char.style.left = `${Math.random() * 100}%`;
-        char.style.top = `${Math.random() * 100}%`;
-        char.style.animationDelay = `${Math.random() * 5}s`;
-        char.style.animationDuration = `${1 + Math.random() * 3}s`;
-        container.appendChild(char);
-        
-        // Animate the character
-        animateChar(char);
+    if (!container) return;
+
+    for (let i = 0; i < 60; i++) {
+        const el = document.createElement('div');
+        el.className = 'matrix-char';
+        el.textContent =
+            matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        el.style.left = Math.random() * 100 + '%';
+        el.style.top = Math.random() * 100 + '%';
+        container.appendChild(el);
+        animateMatrixChar(el);
     }
 }
 
-function animateChar(char) {
+function animateMatrixChar(el) {
+    let y = Math.random() * 100;
     let opacity = 1;
-    let top = parseFloat(char.style.top);
-    
-    function update() {
-        opacity -= 0.01;
-        top += 0.5;
-        
-        if (opacity <= 0 || top > 100) {
+
+    function fall() {
+        y += 0.3;
+        opacity -= 0.004;
+
+        if (y > 100 || opacity <= 0) {
+            y = -5;
             opacity = 1;
-            top = -5;
-            char.textContent = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+            el.textContent =
+                matrixChars[Math.floor(Math.random() * matrixChars.length)];
         }
-        
-        char.style.opacity = opacity;
-        char.style.top = `${top}%`;
-        
-        requestAnimationFrame(update);
+
+        el.style.top = y + '%';
+        el.style.opacity = opacity;
+        requestAnimationFrame(fall);
     }
-    
-    update();
+    fall();
 }
 
-// --- INTERACTIVE 3D CUBE ---
+// ================= INTERACTIVE CUBE =================
 function initInteractiveCube() {
-    const interactiveCube = document.getElementById('interactive-cube');
-    
-    document.addEventListener('mousemove', (e) => {
-        const x = (window.innerWidth / 2 - e.clientX) / 50;
-        const y = (window.innerHeight / 2 - e.clientY) / 50;
-        
-        interactiveCube.style.transform = `rotateX(${-y}deg) rotateY(${x}deg)`;
-    });
+    const cube = document.getElementById('interactive-cube');
+    if (!cube) return;
 
-    interactiveCube.addEventListener('mouseleave', () => {
-        interactiveCube.style.transform = 'rotateX(-10deg) rotateY(-10deg)';
+    document.addEventListener('mousemove', e => {
+        const x = (window.innerWidth / 2 - e.clientX) / 40;
+        const y = (window.innerHeight / 2 - e.clientY) / 40;
+        cube.style.transform = `rotateX(${-y}deg) rotateY(${x}deg)`;
     });
 }
 
-// --- DATA SPHERE INTERACTIONS ---
-function initDataSpheres() {
-    const dataSpheres = document.querySelectorAll('.data-sphere');
-    
-    dataSpheres.forEach(sphere => {
-        sphere.addEventListener('mouseenter', () => {
-            const info = sphere.getAttribute('data-info');
-            showInfoPopup(info, sphere);
-        });
-        
-        sphere.addEventListener('mouseleave', () => {
-            hideInfoPopup();
-        });
-        
-        // Add click effect
-        sphere.addEventListener('click', () => {
-            sphere.style.animation = 'none';
-            setTimeout(() => {
-                sphere.style.animation = 'floatSphere 15s infinite ease-in-out';
-            }, 100);
-        });
-    });
-}
-
-function showInfoPopup(text, element) {
-    let popup = document.querySelector('.info-popup');
-    if (!popup) {
-        popup = document.createElement('div');
-        popup.className = 'info-popup';
-        popup.style.cssText = `
-            position: fixed;
-            background: rgba(0, 0, 0, 0.9);
-            color: var(--neon-cyan);
-            padding: 10px 20px;
-            border-radius: 10px;
-            border: 2px solid var(--neon-cyan);
-            z-index: 1000;
-            font-family: 'Orbitron', monospace;
-            box-shadow: 0 0 20px var(--neon-cyan);
-            pointer-events: none;
-            transition: all 0.3s;
-            font-size: 0.9rem;
-        `;
-        document.body.appendChild(popup);
-    }
-    
-    const rect = element.getBoundingClientRect();
-    popup.textContent = `> ${text}`;
-    popup.style.left = `${rect.left + rect.width / 2}px`;
-    popup.style.top = `${rect.top - 50}px`;
-    popup.style.transform = 'translateX(-50%)';
-    popup.style.opacity = '1';
-}
-
-function hideInfoPopup() {
-    const popup = document.querySelector('.info-popup');
-    if (popup) {
-        popup.style.opacity = '0';
-    }
-}
-
-// --- SKILL ORB INTERACTIONS ---
-function initSkillOrbs() {
-    const skillOrbs = document.querySelectorAll('.skill-orb');
-    
-    skillOrbs.forEach(orb => {
-        orb.addEventListener('mouseenter', () => {
-            const skill = orb.getAttribute('data-skill');
-            const percent = orb.getAttribute('data-percent');
-            
-            orb.setAttribute('data-original-html', orb.innerHTML);
-            orb.innerHTML = `
-                <div style="position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-                    <div style="font-size: 2rem; font-weight: bold; text-shadow: 0 0 15px currentColor;">${percent}%</div>
-                    <div style="font-size: 1rem; margin-top: 10px; opacity: 0.9;">${skill}</div>
-                </div>
-            `;
-        });
-        
-        orb.addEventListener('mouseleave', () => {
-            const originalHTML = orb.getAttribute('data-original-html');
-            if (originalHTML) {
-                orb.innerHTML = originalHTML;
-            }
-        });
-        
-        // Add click effect
-        orb.addEventListener('click', () => {
-            orb.style.animation = 'none';
-            setTimeout(() => {
-                orb.style.animation = 'orbFloat 6s infinite ease-in-out';
-            }, 100);
-        });
-    });
-}
-
-// --- PROJECT CARD ENHANCEMENT ---
-function initProjectCards() {
-    const projectCards = document.querySelectorAll('.project-card');
-    
-    projectCards.forEach(card => {
-        card.addEventListener('mouseenter', () => {
-            card.style.transitionDuration = '0.5s';
-        });
-        
-        card.addEventListener('mouseleave', () => {
-            card.style.transitionDuration = '0.8s';
-        });
-        
-        // Add touch support for mobile
-        card.addEventListener('touchstart', () => {
-            card.style.transitionDuration = '0.5s';
-            card.style.transform = card.style.transform.includes('180deg') 
-                ? 'rotateY(0deg)' 
-                : 'rotateY(180deg)';
-        });
-    });
-}
-
-// --- NAVIGATION INDICATORS ---
-function initNavigation() {
+// ================= NAVIGATION =================
+function updateActiveSection() {
     const sections = document.querySelectorAll('section');
-    const navDots = document.querySelectorAll('.nav-dot');
-    
-    function updateActiveSection() {
-        let current = '';
-        
-        sections.forEach(section => {
-            const sectionTop = section.offsetTop;
-            const sectionHeight = section.clientHeight;
-            
-            if (window.pageYOffset >= sectionTop - 200) {
-                current = section.getAttribute('id');
-            }
-        });
-        
-        navDots.forEach(dot => {
-            dot.classList.remove('active');
-            if (dot.getAttribute('data-section').toLowerCase() === current || 
-                (current === 'hero' && dot.getAttribute('data-section') === 'Home')) {
-                dot.classList.add('active');
-            }
-        });
-    }
-    
-    window.addEventListener('scroll', updateActiveSection);
-    
-    // Initialize active section
-    updateActiveSection();
+    const dots = document.querySelectorAll('.nav-dot');
+    let current = '';
+
+    sections.forEach(sec => {
+        if (window.scrollY >= sec.offsetTop - 200) {
+            current = sec.id;
+        }
+    });
+
+    dots.forEach(dot => {
+        dot.classList.remove('active');
+        if (
+            dot.dataset.section.toLowerCase() === current ||
+            (current === 'hero' && dot.dataset.section === 'Home')
+        ) {
+            dot.classList.add('active');
+        }
+    });
 }
 
-function scrollToSection(sectionId) {
-    const element = document.getElementById(sectionId);
-    if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-    }
+function scrollToSection(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
 }
+window.scrollToSection = scrollToSection;
 
-// --- TYPING EFFECT FOR HERO TEXT ---
+// ================= TEXT EFFECTS =================
 function initTypingEffect() {
-    const heroText = document.querySelector('.hero-text .holo-card-3d p');
-    const originalText = heroText.innerHTML;
-    heroText.innerHTML = '';
-    
-    let charIndex = 0;
-    function typeWriter() {
-        if (charIndex < originalText.length) {
-            heroText.innerHTML += originalText.charAt(charIndex);
-            charIndex++;
-            setTimeout(typeWriter, 30);
+    const el = document.querySelector('.hero-text .holo-card-3d p');
+    if (!el) return;
+
+    const text = el.innerHTML;
+    el.innerHTML = '';
+    let i = 0;
+
+    function type() {
+        if (i < text.length) {
+            el.innerHTML += text.charAt(i++);
+            setTimeout(type, 25);
         }
     }
-    
-    setTimeout(typeWriter, 1000);
+    setTimeout(type, 800);
 }
 
-// --- TEXT SCRAMBLE EFFECT ---
 function initGlitchEffect() {
-    const glitchText = document.querySelector('.glitch');
-    const originalText = glitchText.textContent;
-    
-    glitchText.addEventListener('mouseover', () => {
-        let iterations = 0;
+    const el = document.querySelector('.glitch');
+    if (!el) return;
+
+    const original = el.textContent;
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    el.addEventListener('mouseenter', () => {
+        let i = 0;
         const interval = setInterval(() => {
-            glitchText.textContent = glitchText.textContent.split("")
-                .map((char, index) => {
-                    if (index < iterations) {
-                        return originalText[index];
-                    }
-                    return "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>/!@#$%"[Math.floor(Math.random() * 40)];
-                })
-                .join("");
-            
-            if (iterations >= originalText.length) {
+            el.textContent = original
+                .split('')
+                .map((c, idx) => (idx < i ? original[idx] : chars[Math.floor(Math.random() * chars.length)]))
+                .join('');
+
+            if (i >= original.length) {
                 clearInterval(interval);
-                setTimeout(() => {
-                    glitchText.textContent = originalText;
-                }, 100);
+                el.textContent = original;
             }
-            
-            iterations += 1 / 2;
+            i += 0.5;
         }, 30);
     });
 }
 
-// --- SET CURRENT DATE ---
+// ================= DATE =================
 function setCurrentDate() {
-    const date = new Date();
-    const options = { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-    };
-    const dateString = date.toLocaleDateString('en-US', options);
-    
-    document.getElementById('current-date').textContent = `SYSTEM TIME: ${dateString}`;
+    const el = document.getElementById('current-date');
+    if (!el) return;
+    el.textContent = `SYSTEM TIME: ${new Date().toLocaleString()}`;
 }
 
-// --- PERFORMANCE OPTIMIZATION ---
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// --- INITIALIZE EVERYTHING ---
+// ================= INIT =================
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize all components
     initThreeJS();
     createMatrixRain();
     initInteractiveCube();
-    initDataSpheres();
-    initSkillOrbs();
-    initProjectCards();
-    initNavigation();
     initTypingEffect();
     initGlitchEffect();
     setCurrentDate();
-    
-    // Console greeting
-    console.log('%c> SYSTEM INITIALIZED', 'color: #00f3ff; font-size: 16px; font-weight: bold;');
-    console.log('%c> 3D Holographic Interface v3.0 Active', 'color: #ff00ff;');
-    console.log('%c> Neural Connection Established', 'color: #00ff9d;');
-    console.log('%c> Welcome to the Digital Realm, Kishan', 'color: #ffd700;');
-    
-    // Performance optimization for scroll events
-    const debouncedScroll = debounce(updateActiveSection, 100);
-    window.addEventListener('scroll', debouncedScroll);
-});
 
-// Make scrollToSection available globally
-window.scrollToSection = scrollToSection;
+    window.addEventListener('scroll', updateActiveSection);
+
+    console.log('%cSYSTEM ONLINE', 'color:#00f3ff;font-size:14px;');
+});
