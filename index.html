@@ -4,90 +4,1262 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kishan Rathore | 3D Holographic Interface</title>
-
-    <!-- Fonts & Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        /* --- ENHANCED VARIABLES --- */
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #00ff9d;
+            --neon-yellow: #ffd700;
+            --neon-purple: #9d00ff;
+            --bg-dark: #050510;
+            --bg-darker: #010115;
+            --glass-bg: rgba(0, 243, 255, 0.08);
+            --glass-border: rgba(0, 243, 255, 0.4);
+            --border-glow: 0 0 20px rgba(0, 243, 255, 0.7);
+            --text-glow: 0 0 15px currentColor;
+            --pulse-animation: pulse 2s infinite;
+        }
 
-    <!-- MAIN CSS (correct file name) -->
-    <link rel="stylesheet" href="sty.css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Orbitron', 'Segoe UI', monospace;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap');
+
+        body {
+            background-color: var(--bg-darker);
+            color: var(--neon-cyan);
+            overflow-x: hidden;
+            min-height: 100vh;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(0, 243, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 40% 60%, rgba(0, 255, 157, 0.05) 0%, transparent 50%),
+                linear-gradient(180deg, #050510 0%, #0a0a25 30%, #050510 100%);
+        }
+
+        /* --- CANVAS BACKGROUND --- */
+        #threejs-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+        }
+
+        /* --- FLOATING 3D ELEMENTS --- */
+        .floating-3d {
+            position: fixed;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        .cube {
+            width: 100px;
+            height: 100px;
+            transform-style: preserve-3d;
+            animation: rotateCube 20s infinite linear;
+            transform: rotateX(45deg) rotateY(45deg);
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border: 2px solid var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.1);
+        }
+
+        .cube-face:nth-child(1) { transform: rotateY(0deg) translateZ(50px); }
+        .cube-face:nth-child(2) { transform: rotateY(90deg) translateZ(50px); }
+        .cube-face:nth-child(3) { transform: rotateY(180deg) translateZ(50px); }
+        .cube-face:nth-child(4) { transform: rotateY(-90deg) translateZ(50px); }
+        .cube-face:nth-child(5) { transform: rotateX(90deg) translateZ(50px); }
+        .cube-face:nth-child(6) { transform: rotateX(-90deg) translateZ(50px); }
+
+        @keyframes rotateCube {
+            0% { transform: rotateX(45deg) rotateY(0deg); }
+            100% { transform: rotateX(45deg) rotateY(360deg); }
+        }
+
+        /* --- INTERACTIVE DATA SPHERES --- */
+        .data-sphere {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--neon-pink), transparent 70%);
+            box-shadow: 0 0 30px var(--neon-pink);
+            animation: floatSphere 15s infinite ease-in-out;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        .data-sphere:hover {
+            transform: scale(1.5);
+            box-shadow: 0 0 50px var(--neon-pink);
+        }
+
+        .data-sphere::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 2px solid var(--neon-pink);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes floatSphere {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-50px) rotate(180deg); }
+        }
+
+        /* --- MAIN CONTAINER --- */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* --- ENHANCED HEADER WITH HUD --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem 0;
+            margin-bottom: 5rem;
+            position: relative;
+            border-bottom: 1px solid transparent;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(0, 243, 255, 0.1) 20%, 
+                rgba(0, 243, 255, 0.2) 50%,
+                rgba(0, 243, 255, 0.1) 80%, 
+                transparent);
+            background-size: 200% 100%;
+            animation: headerGlow 3s infinite linear;
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.2);
+        }
+
+        @keyframes headerGlow {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 900;
+            text-shadow: 0 0 20px var(--neon-cyan);
+            letter-spacing: 5px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+        }
+
+        .logo::before, .logo::after {
+            content: '◀▶';
+            color: var(--neon-pink);
+            font-size: 1.5rem;
+            animation: logoBounce 2s infinite;
+        }
+
+        @keyframes logoBounce {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(10px); }
+        }
+
+        .status-hud {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .hud-bar {
+            width: 100px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .hud-fill {
+            height: 100%;
+            background: var(--neon-green);
+            border-radius: 3px;
+            animation: hudPulse 3s infinite;
+        }
+
+        @keyframes hudPulse {
+            0%, 100% { width: 100%; }
+            50% { width: 85%; }
+        }
+
+        /* --- 3D INTERACTIVE HERO --- */
+        .hero {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            min-height: 80vh;
+            margin-bottom: 8rem;
+            position: relative;
+        }
+
+        .hero-text {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-visual {
+            position: relative;
+            height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Matrix Rain Effect */
+        .matrix-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+            opacity: 0.3;
+        }
+
+        .matrix-char {
+            position: absolute;
+            color: var(--neon-green);
+            font-size: 1.2rem;
+            font-family: monospace;
+            opacity: 0.8;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+
+        /* Enhanced Glitch Effect */
+        .glitch-wrapper {
+            position: relative;
+            margin-bottom: 3rem;
+        }
+
+        .glitch {
+            font-size: 5rem;
+            font-weight: 900;
+            position: relative;
+            color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            -webkit-text-stroke: 2px var(--neon-cyan);
+            text-stroke: 2px var(--neon-cyan);
+            animation: glitchStroke 5s infinite alternate;
+        }
+
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            -webkit-text-stroke: 0;
+            text-stroke: 0;
+        }
+
+        .glitch::before {
+            color: var(--neon-pink);
+            animation: glitchTop 3s infinite linear alternate-reverse;
+            clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
+            z-index: -1;
+        }
+
+        .glitch::after {
+            color: var(--neon-green);
+            animation: glitchBottom 2.5s infinite linear alternate-reverse;
+            clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%);
+            z-index: -2;
+        }
+
+        @keyframes glitchTop {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+        }
+
+        @keyframes glitchBottom {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(2px, -2px); }
+            40% { transform: translate(2px, 2px); }
+            60% { transform: translate(-2px, -2px); }
+            80% { transform: translate(-2px, 2px); }
+        }
+
+        @keyframes glitchStroke {
+            0% { -webkit-text-stroke-color: var(--neon-cyan); }
+            25% { -webkit-text-stroke-color: var(--neon-pink); }
+            50% { -webkit-text-stroke-color: var(--neon-green); }
+            75% { -webkit-text-stroke-color: var(--neon-yellow); }
+            100% { -webkit-text-stroke-color: var(--neon-cyan); }
+        }
+
+        .role {
+            font-size: 1.8rem;
+            color: var(--neon-green);
+            text-shadow: var(--text-glow);
+            margin: 2rem 0;
+            position: relative;
+            display: inline-block;
+        }
+
+        .role::after {
+            content: '_';
+            animation: blink 1s infinite;
+            color: var(--neon-cyan);
+        }
+
+        /* --- INTERACTIVE 3D CUBE IN HERO --- */
+        .interactive-cube {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(-10deg) rotateY(-10deg);
+            transition: transform 0.1s;
+        }
+
+        .cube-side {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border: 3px solid;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            backdrop-filter: blur(5px);
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        .cube-side:nth-child(1) { 
+            transform: translateZ(150px); 
+            border-color: var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.1);
+        }
+        .cube-side:nth-child(2) { 
+            transform: rotateY(90deg) translateZ(150px); 
+            border-color: var(--neon-pink);
+            background: rgba(255, 0, 255, 0.1);
+        }
+        .cube-side:nth-child(3) { 
+            transform: rotateY(180deg) translateZ(150px); 
+            border-color: var(--neon-green);
+            background: rgba(0, 255, 157, 0.1);
+        }
+        .cube-side:nth-child(4) { 
+            transform: rotateY(-90deg) translateZ(150px); 
+            border-color: var(--neon-yellow);
+            background: rgba(255, 215, 0, 0.1);
+        }
+        .cube-side:nth-child(5) { 
+            transform: rotateX(90deg) translateZ(150px); 
+            border-color: var(--neon-purple);
+            background: rgba(157, 0, 255, 0.1);
+        }
+        .cube-side:nth-child(6) { 
+            transform: rotateX(-90deg) translateZ(150px); 
+            border-color: var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.1);
+        }
+
+        /* --- ENHANCED HOLO CARDS WITH 3D --- */
+        .cards-3d-container {
+            perspective: 1000px;
+            margin: 3rem 0;
+        }
+
+        .holo-card-3d {
+            background: linear-gradient(145deg, 
+                rgba(0, 243, 255, 0.05), 
+                rgba(255, 0, 255, 0.05));
+            border: 1px solid transparent;
+            border-radius: 20px;
+            padding: 3rem;
+            margin: 2rem 0;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(15px);
+            box-shadow: 
+                inset 0 0 50px rgba(0, 243, 255, 0.1),
+                0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .holo-card-3d::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, 
+                var(--neon-cyan), 
+                var(--neon-pink), 
+                var(--neon-green));
+            border-radius: 22px;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .holo-card-3d:hover {
+            transform: translateY(-20px) rotateX(5deg) rotateY(5deg);
+        }
+
+        .holo-card-3d:hover::before {
+            opacity: 1;
+            animation: borderRotate 3s linear infinite;
+        }
+
+        @keyframes borderRotate {
+            0% { filter: hue-rotate(0deg) blur(10px); }
+            100% { filter: hue-rotate(360deg) blur(10px); }
+        }
+
+        .holo-card-3d h3 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: white;
+            text-shadow: var(--text-glow);
+            position: relative;
+            display: inline-block;
+        }
+
+        .holo-card-3d h3::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, 
+                var(--neon-cyan), 
+                var(--neon-pink));
+            border-radius: 2px;
+        }
+
+        /* --- PROJECT GRID WITH PARALLAX --- */
+        .project-grid-3d {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 3rem;
+            perspective: 1000px;
+        }
+
+        .project-card {
+            height: 300px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s;
+            cursor: pointer;
+        }
+
+        .project-card:hover {
+            transform: rotateY(180deg);
+        }
+
+        .project-front, .project-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 20px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .project-front {
+            background: linear-gradient(135deg, 
+                rgba(0, 243, 255, 0.1), 
+                rgba(255, 0, 255, 0.1));
+            border: 2px solid var(--neon-cyan);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.3);
+        }
+
+        .project-back {
+            background: linear-gradient(135deg, 
+                rgba(157, 0, 255, 0.1), 
+                rgba(0, 255, 157, 0.1));
+            border: 2px solid var(--neon-pink);
+            transform: rotateY(180deg);
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.3);
+        }
+
+        /* --- 3D SKILL ORBS --- */
+        .skills-orb-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 3rem;
+            margin: 4rem 0;
+        }
+
+        .skill-orb {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: orbFloat 6s infinite ease-in-out;
+            cursor: pointer;
+        }
+
+        .skill-orb-inner {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, 
+                var(--orb-color), 
+                transparent 70%);
+            box-shadow: 
+                inset 0 0 50px rgba(255, 255, 255, 0.3),
+                0 0 50px var(--orb-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 10px currentColor;
+            transition: all 0.3s;
+        }
+
+        .skill-orb:hover .skill-orb-inner {
+            transform: scale(1.2);
+            box-shadow: 
+                inset 0 0 70px rgba(255, 255, 255, 0.5),
+                0 0 80px var(--orb-color);
+        }
+
+        @keyframes orbFloat {
+            0%, 100% { transform: translateY(0) rotateY(0deg); }
+            50% { transform: translateY(-30px) rotateY(180deg); }
+        }
+
+        /* --- INTERACTIVE CONTACT PANEL --- */
+        .contact-portal {
+            background: linear-gradient(135deg, 
+                rgba(0, 243, 255, 0.05), 
+                rgba(157, 0, 255, 0.05));
+            border-radius: 30px;
+            padding: 4rem;
+            margin: 5rem 0;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid transparent;
+            animation: portalGlow 4s infinite alternate;
+        }
+
+        @keyframes portalGlow {
+            0% { box-shadow: 0 0 50px rgba(0, 243, 255, 0.3); }
+            100% { box-shadow: 0 0 80px rgba(255, 0, 255, 0.3); }
+        }
+
+        .contact-portal::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(
+                from 0deg,
+                transparent,
+                var(--neon-cyan),
+                var(--neon-pink),
+                var(--neon-green),
+                transparent
+            );
+            animation: rotatePortal 10s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotatePortal {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .contact-grid-3d {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        .contact-node {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.3s;
+            border: 1px solid var(--neon-cyan);
+        }
+
+        .contact-node:hover {
+            transform: translateY(-10px) scale(1.05);
+            border-color: var(--neon-pink);
+            box-shadow: 0 10px 30px rgba(255, 0, 255, 0.3);
+        }
+
+        /* --- FOOTER WITH PARTICLE EFFECT --- */
+        footer {
+            text-align: center;
+            padding: 4rem 0;
+            margin-top: 8rem;
+            position: relative;
+            overflow: hidden;
+            border-top: 1px solid rgba(0, 243, 255, 0.3);
+        }
+
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent, 
+                var(--neon-cyan), 
+                var(--neon-pink), 
+                var(--neon-cyan), 
+                transparent);
+        }
+
+        /* --- RESPONSIVE DESIGN --- */
+        @media (max-width: 1200px) {
+            .hero {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            
+            .hero-visual {
+                order: -1;
+                height: 400px;
+            }
+            
+            .interactive-cube {
+                width: 250px;
+                height: 250px;
+            }
+            
+            .cube-side {
+                width: 250px;
+                height: 250px;
+                padding: 1.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .glitch {
+                font-size: 3rem;
+                letter-spacing: 4px;
+            }
+            
+            .project-grid-3d {
+                grid-template-columns: 1fr;
+            }
+            
+            .contact-portal {
+                padding: 2rem;
+            }
+            
+            .holo-card-3d {
+                padding: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .glitch {
+                font-size: 2.2rem;
+                letter-spacing: 2px;
+            }
+            
+            .logo {
+                font-size: 1.8rem;
+            }
+            
+            .interactive-cube {
+                width: 200px;
+                height: 200px;
+            }
+            
+            .cube-side {
+                width: 200px;
+                height: 200px;
+                padding: 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
 </head>
-
 <body>
-
-<!-- ================= BACKGROUND LAYER ================= -->
-<div id="background-layer">
+    <!-- Three.js Canvas for 3D Background -->
     <canvas id="threejs-canvas"></canvas>
-    <div class="matrix-container" id="matrix"></div>
-</div>
-
-<!-- ================= FOREGROUND CONTENT ================= -->
-<div class="container foreground">
 
     <!-- Floating 3D Elements -->
-    <div class="floating-3d" style="top:10%; left:5%;">
+    <div class="floating-3d" style="top: 10%; left: 5%;">
         <div class="cube">
-            <div class="cube-face"></div><div class="cube-face"></div>
-            <div class="cube-face"></div><div class="cube-face"></div>
-            <div class="cube-face"></div><div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
         </div>
     </div>
 
-    <div class="floating-3d" style="top:60%; right:8%;">
-        <div class="cube" style="width:70px;height:70px;animation-duration:15s;">
-            <div class="cube-face"></div><div class="cube-face"></div>
-            <div class="cube-face"></div><div class="cube-face"></div>
-            <div class="cube-face"></div><div class="cube-face"></div>
+    <div class="floating-3d" style="top: 60%; right: 8%;">
+        <div class="cube" style="width: 70px; height: 70px; animation-duration: 15s;">
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
+            <div class="cube-face"></div>
         </div>
     </div>
 
-    <!-- Header -->
-    <header>
-        <div class="logo">
-            <i class="fas fa-code"></i>
-            <span>KISHAN_RATHORE</span>
-        </div>
-    </header>
+    <!-- Interactive Data Spheres -->
+    <div class="data-sphere" style="top: 20%; right: 15%;" data-info="Frontend Developer"></div>
+    <div class="data-sphere" style="top: 70%; left: 10%;" data-info="C Programmer"></div>
+    <div class="data-sphere" style="top: 40%; left: 20%;" data-info="Tech Enthusiast"></div>
 
-    <!-- HERO -->
-    <section class="hero" id="hero">
-        <div class="hero-text">
-            <h1 class="glitch" data-text="KISHAN RATHORE">KISHAN RATHORE</h1>
-            <p class="role">Frontend Developer | C Programmer | Tech Enthusiast</p>
+    <!-- Matrix Rain Container -->
+    <div class="matrix-container" id="matrix"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span>KISHAN_RATHORE</span>
+            </div>
+            <div class="status-hud">
+                <div class="hud-item">
+                    <span>SYSTEM STATUS:</span>
+                    <div class="hud-bar">
+                        <div class="hud-fill"></div>
+                    </div>
+                    <span style="color: var(--neon-green);">ONLINE</span>
+                </div>
+                <div class="hud-item">
+                    <span>DATA TRANSFER:</span>
+                    <div class="hud-bar">
+                        <div class="hud-fill" style="background: var(--neon-pink);"></div>
+                    </div>
+                    <span style="color: var(--neon-pink);">ACTIVE</span>
+                </div>
+            </div>
+        </header>
+
+        <section class="hero">
+            <div class="hero-text">
+                <div class="glitch-wrapper">
+                    <h1 class="glitch" data-text="KISHAN RATHORE">KISHAN RATHORE</h1>
+                </div>
+                <p class="role">Frontend Developer | C Programmer | Tech Enthusiast</p>
+                <div class="holo-card-3d" style="margin-top: 3rem;">
+                    <p style="font-size: 1.3rem; line-height: 1.8;">
+                        > Welcome to my interactive 3D portfolio interface.<br>
+                        > System initialized: Holographic projection active.<br>
+                        > Neural interface connected.<br>
+                        > Ready to explore my digital realm.
+                    </p>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="interactive-cube" id="interactive-cube">
+                    <div class="cube-side">
+                        <i class="fas fa-code" style="font-size: 3rem; color: var(--neon-cyan); margin-bottom: 1rem;"></i>
+                        <h3>CODING</h3>
+                        <p>Algorithmic Thinking</p>
+                    </div>
+                    <div class="cube-side">
+                        <i class="fas fa-palette" style="font-size: 3rem; color: var(--neon-pink); margin-bottom: 1rem;"></i>
+                        <h3>DESIGN</h3>
+                        <p>Creative Solutions</p>
+                    </div>
+                    <div class="cube-side">
+                        <i class="fas fa-brain" style="font-size: 3rem; color: var(--neon-green); margin-bottom: 1rem;"></i>
+                        <h3>LOGIC</h3>
+                        <p>Problem Solving</p>
+                    </div>
+                    <div class="cube-side">
+                        <i class="fas fa-rocket" style="font-size: 3rem; color: var(--neon-yellow); margin-bottom: 1rem;"></i>
+                        <h3>INNOVATION</h3>
+                        <p>Future Focused</p>
+                    </div>
+                    <div class="cube-side">
+                        <i class="fas fa-network-wired" style="font-size: 3rem; color: var(--neon-purple); margin-bottom: 1rem;"></i>
+                        <h3>TECH</h3>
+                        <p>Always Learning</p>
+                    </div>
+                    <div class="cube-side">
+                        <i class="fas fa-infinity" style="font-size: 3rem; color: var(--neon-cyan); margin-bottom: 1rem;"></i>
+                        <h3>PASSION</h3>
+                        <p>Limitless Energy</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="projects">
+            <div class="holo-card-3d cards-3d-container">
+                <h3><i class="fas fa-satellite-dish"></i> PROJECT ARCHIVES</h3>
+                <div class="project-grid-3d">
+                    <div class="project-card">
+                        <div class="project-front">
+                            <i class="fab fa-cuttlefish" style="font-size: 4rem; color: var(--neon-cyan); margin-bottom: 1.5rem;"></i>
+                            <h3>PFC-WORK</h3>
+                            <p>Advanced C Programming</p>
+                            <p style="margin-top: 1rem; opacity: 0.8;">Click to view details</p>
+                        </div>
+                        <div class="project-back">
+                            <h3>SYSTEM DETAILS</h3>
+                            <p>Comprehensive C programming repository demonstrating advanced algorithms, data structures, and system design principles.</p>
+                            <div class="project-tags" style="margin-top: 1.5rem;">
+                                <span class="tag" style="background: rgba(0, 243, 255, 0.2); border: 1px solid var(--neon-cyan); padding: 5px 15px; border-radius: 20px; margin: 5px;">C Programming</span>
+                                <span class="tag" style="background: rgba(0, 243, 255, 0.2); border: 1px solid var(--neon-cyan); padding: 5px 15px; border-radius: 20px; margin: 5px;">Algorithms</span>
+                            </div>
+                            <a href="https://github.com/Kishanrathore10687/PFC-Work" target="_blank" style="margin-top: 2rem; color: var(--neon-cyan); text-decoration: none; border: 1px solid var(--neon-cyan); padding: 10px 25px; border-radius: 30px; transition: all 0.3s;">
+                                ACCESS REPO <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="project-card">
+                        <div class="project-front">
+                            <i class="fas fa-code" style="font-size: 4rem; color: var(--neon-pink); margin-bottom: 1.5rem;"></i>
+                            <h3>WEB-TECH</h3>
+                            <p>Frontend Development</p>
+                            <p style="margin-top: 1rem; opacity: 0.8;">Click to view details</p>
+                        </div>
+                        <div class="project-back">
+                            <h3>SYSTEM DETAILS</h3>
+                            <p>Modern web technologies exploration with HTML5, CSS3, JavaScript, and responsive design implementations.</p>
+                            <div class="project-tags" style="margin-top: 1.5rem;">
+                                <span class="tag" style="background: rgba(255, 0, 255, 0.2); border: 1px solid var(--neon-pink); padding: 5px 15px; border-radius: 20px; margin: 5px;">HTML5</span>
+                                <span class="tag" style="background: rgba(255, 0, 255, 0.2); border: 1px solid var(--neon-pink); padding: 5px 15px; border-radius: 20px; margin: 5px;">CSS3</span>
+                                <span class="tag" style="background: rgba(255, 0, 255, 0.2); border: 1px solid var(--neon-pink); padding: 5px 15px; border-radius: 20px; margin: 5px;">JavaScript</span>
+                            </div>
+                            <a href="https://github.com/Kishanrathore10687/Web-Tech" target="_blank" style="margin-top: 2rem; color: var(--neon-pink); text-decoration: none; border: 1px solid var(--neon-pink); padding: 10px 25px; border-radius: 30px; transition: all 0.3s;">
+                                ACCESS REPO <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="skills">
             <div class="holo-card-3d">
-                <p>
-                    &gt; Welcome to my interactive 3D portfolio.<br>
-                    &gt; System initialized.<br>
-                    &gt; Ready to explore.
-                </p>
+                <h3><i class="fas fa-microchip"></i> SKILL MATRIX</h3>
+                <div class="skills-orb-container">
+                    <div class="skill-orb" style="--orb-color: var(--neon-cyan);">
+                        <div class="skill-orb-inner">
+                            <div>C</div>
+                            <div style="position: absolute; bottom: 20px; font-size: 1rem;">85%</div>
+                        </div>
+                    </div>
+                    <div class="skill-orb" style="--orb-color: var(--neon-pink);">
+                        <div class="skill-orb-inner">
+                            <div>HTML</div>
+                            <div style="position: absolute; bottom: 20px; font-size: 1rem;">90%</div>
+                        </div>
+                    </div>
+                    <div class="skill-orb" style="--orb-color: var(--neon-green);">
+                        <div class="skill-orb-inner">
+                            <div>CSS</div>
+                            <div style="position: absolute; bottom: 20px; font-size: 1rem;">80%</div>
+                        </div>
+                    </div>
+                    <div class="skill-orb" style="--orb-color: var(--neon-yellow);">
+                        <div class="skill-orb-inner">
+                            <div>JS</div>
+                            <div style="position: absolute; bottom: 20px; font-size: 1rem;">75%</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- PROJECTS -->
-    <section id="projects">
-        <h2>PROJECT ARCHIVES</h2>
-        <div class="project-grid-3d">
-
-            <div class="project-card">
-                <h3>PFC-WORK</h3>
-                <p>Advanced C Programming</p>
-                <a href="https://github.com/Kishanrathore10687/PFC-Work" target="_blank">
-                    View Repo
-                </a>
+        <section id="contact">
+            <div class="contact-portal">
+                <h3 style="text-align: center; font-size: 2.5rem; margin-bottom: 3rem; text-shadow: 0 0 20px var(--neon-cyan);">
+                    <i class="fas fa-broadcast-tower"></i> TRANSMISSION PORTAL
+                </h3>
+                <div class="contact-grid-3d">
+                    <div class="contact-node">
+                        <i class="fas fa-envelope" style="font-size: 3rem; color: var(--neon-cyan);"></i>
+                        <h4>EMAIL</h4>
+                        <a href="mailto:kishan.rathore@rungta.org" style="color: white; text-decoration: none; font-size: 1.1rem;">
+                            kishan.rathore@rungta.org
+                        </a>
+                    </div>
+                    <div class="contact-node">
+                        <i class="fab fa-github" style="font-size: 3rem; color: var(--neon-pink);"></i>
+                        <h4>GITHUB</h4>
+                        <a href="https://github.com/Kishanrathore10687" target="_blank" style="color: white; text-decoration: none; font-size: 1.1rem;">
+                            /Kishanrathore10687
+                        </a>
+                    </div>
+                    <div class="contact-node">
+                        <i class="fab fa-linkedin" style="font-size: 3rem; color: var(--neon-green);"></i>
+                        <h4>LINKEDIN</h4>
+                        <a href="https://www.linkedin.com" target="_blank" style="color: white; text-decoration: none; font-size: 1.1rem;">
+                            /in/kishanrathore
+                        </a>
+                    </div>
+                </div>
             </div>
+        </section>
 
-            <div class="project-card">
-                <h3>WEB-TECH</h3>
-                <p>Frontend Development</p>
-                <a href="https://github.com/Kishanrathore10687/Web-Tech" target="_blank">
-                    View Repo
-                </a>
+        <footer>
+            <p style="font-size: 1.2rem; margin-bottom: 1rem; text-shadow: 0 0 10px var(--neon-cyan);">
+                SYSTEM TERMINAL: END OF TRANSMISSION
+            </p>
+            <p style="opacity: 0.8; margin-bottom: 2rem;">
+                © 2024 KISHAN RATHORE | 3D HOLOGRAPHIC INTERFACE v3.0
+            </p>
+            <div style="display: flex; justify-content: center; gap: 2rem; opacity: 0.6;">
+                <span><i class="fas fa-server"></i> SYSTEM: OPERATIONAL</span>
+                <span><i class="fas fa-database"></i> DATA: ENCRYPTED</span>
+                <span><i class="fas fa-shield-alt"></i> SECURITY: ACTIVE</span>
             </div>
+        </footer>
+    </div>
 
-            <div class="project-card">
-                <h3>3D PORTFOLIO</h3>
-                <p>Current Project</p>
-            </div>
+    <script>
+        // --- THREE.JS 3D BACKGROUND ---
+        let scene, camera, renderer, particles, particleSystem;
 
-        <
+        function initThreeJS() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000010, 0.001);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 50;
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: document.getElementById('threejs-canvas'),
+                alpha: true,
+                antialias: true 
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Create particle system
+            const particleCount = 2000;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                // Positions
+                positions[i] = (Math.random() - 0.5) * 200;
+                positions[i + 1] = (Math.random() - 0.5) * 200;
+                positions[i + 2] = (Math.random() - 0.5) * 200;
+
+                // Colors
+                const color = new THREE.Color();
+                color.setHSL(Math.random(), 1.0, 0.7);
+                colors[i] = color.r;
+                colors[i + 1] = color.g;
+                colors[i + 2] = color.b;
+            }
+
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            // Material
+            const particleMaterial = new THREE.PointsMaterial({
+                size: 0.5,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            // Particle system
+            particleSystem = new THREE.Points(particles, particleMaterial);
+            scene.add(particleSystem);
+
+            // Add some 3D objects
+            const geometry = new THREE.IcosahedronGeometry(10, 0);
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0x00f3ff, 
+                wireframe: true,
+                transparent: true,
+                opacity: 0.2
+            });
+            const icosahedron = new THREE.Mesh(geometry, material);
+            icosahedron.position.set(20, 10, -50);
+            scene.add(icosahedron);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x00f3ff, 0.1);
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xff00ff, 0.5);
+            pointLight.position.set(50, 50, 50);
+            scene.add(pointLight);
+
+            // Animation
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                particleSystem.rotation.x += 0.0005;
+                particleSystem.rotation.y += 0.001;
+                
+                icosahedron.rotation.x += 0.005;
+                icosahedron.rotation.y += 0.005;
+                
+                renderer.render(scene, camera);
+            }
+
+            animate();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // --- MATRIX RAIN EFFECT ---
+        function createMatrixRain() {
+            const container = document.getElementById('matrix');
+            const chars = "01ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
+            
+            for (let i = 0; i < 100; i++) {
+                const char = document.createElement('div');
+                char.className = 'matrix-char';
+                char.textContent = chars[Math.floor(Math.random() * chars.length)];
+                char.style.left = `${Math.random() * 100}%`;
+                char.style.top = `${Math.random() * 100}%`;
+                char.style.animationDelay = `${Math.random() * 5}s`;
+                char.style.animationDuration = `${1 + Math.random() * 3}s`;
+                container.appendChild(char);
+                
+                // Animate the character
+                animateChar(char);
+            }
+        }
+
+        function animateChar(char) {
+            let opacity = 1;
+            let top = parseFloat(char.style.top);
+            
+            function update() {
+                opacity -= 0.01;
+                top += 0.5;
+                
+                if (opacity <= 0 || top > 100) {
+                    opacity = 1;
+                    top = -5;
+                    char.textContent = chars[Math.floor(Math.random() * chars.length)];
+                }
+                
+                char.style.opacity = opacity;
+                char.style.top = `${top}%`;
+                
+                requestAnimationFrame(update);
+            }
+            
+            update();
+        }
+
+        // --- INTERACTIVE 3D CUBE ---
+        const interactiveCube = document.getElementById('interactive-cube');
+        document.addEventListener('mousemove', (e) => {
+            const x = (window.innerWidth / 2 - e.clientX) / 50;
+            const y = (window.innerHeight / 2 - e.clientY) / 50;
+            
+            interactiveCube.style.transform = `rotateX(${-y}deg) rotateY(${x}deg)`;
+        });
+
+        interactiveCube.addEventListener('mouseleave', () => {
+            interactiveCube.style.transform = 'rotateX(-10deg) rotateY(-10deg)';
+        });
+
+        // --- DATA SPHERE INTERACTIONS ---
+        const dataSpheres = document.querySelectorAll('.data-sphere');
+        dataSpheres.forEach(sphere => {
+            sphere.addEventListener('mouseenter', () => {
+                const info = sphere.getAttribute('data-info');
+                showInfoPopup(info, sphere);
+            });
+            
+            sphere.addEventListener('mouseleave', () => {
+                hideInfoPopup();
+            });
+        });
+
+        function showInfoPopup(text, element) {
+            let popup = document.querySelector('.info-popup');
+            if (!popup) {
+                popup = document.createElement('div');
+                popup.className = 'info-popup';
+                popup.style.cssText = `
+                    position: fixed;
+                    background: rgba(0, 0, 0, 0.9);
+                    color: var(--neon-cyan);
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    border: 2px solid var(--neon-cyan);
+                    z-index: 1000;
+                    font-family: 'Orbitron', monospace;
+                    box-shadow: 0 0 20px var(--neon-cyan);
+                    pointer-events: none;
+                    transition: all 0.3s;
+                `;
+                document.body.appendChild(popup);
+            }
+            
+            const rect = element.getBoundingClientRect();
+            popup.textContent = `> ${text}`;
+            popup.style.left = `${rect.left + rect.width / 2}px`;
+            popup.style.top = `${rect.top - 50}px`;
+            popup.style.transform = 'translateX(-50%)';
+            popup.style.opacity = '1';
+        }
+
+        function hideInfoPopup() {
+            const popup = document.querySelector('.info-popup');
+            if (popup) {
+                popup.style.opacity = '0';
+            }
+        }
+
+        // --- SKILL ORB INTERACTIONS ---
+        const skillOrbs = document.querySelectorAll('.skill-orb');
+        skillOrbs.forEach(orb => {
+            orb.addEventListener('mouseenter', () => {
+                const skill = orb.querySelector('div').textContent;
+                const percentage = orb.querySelector('div:nth-child(2)').textContent;
+                
+                orb.setAttribute('data-original-html', orb.innerHTML);
+                orb.innerHTML = `
+                    <div style="position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                        <div style="font-size: 2rem; font-weight: bold;">${percentage}</div>
+                        <div style="font-size: 1rem; margin-top: 10px;">${skill}</div>
+                    </div>
+                `;
+            });
+            
+            orb.addEventListener('mouseleave', () => {
+                const originalHTML = orb.getAttribute('data-original-html');
+                if (originalHTML) {
+                    orb.innerHTML = originalHTML;
+                }
+            });
+        });
+
+        // --- PROJECT CARD ENHANCEMENT ---
+        const projectCards = document.querySelectorAll('.project-card');
+        projectCards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transitionDuration = '0.5s';
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.transitionDuration = '0.8s';
+            });
+        });
+
+        // --- INITIALIZE EVERYTHING ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initThreeJS();
+            createMatrixRain();
+            
+            // Add typing effect for hero text
+            const heroText = document.querySelector('.hero-text p');
+            const originalText = heroText.innerHTML;
+            heroText.innerHTML = '';
+            
+            let charIndex = 0;
+            function typeWriter() {
+                if (charIndex < originalText.length) {
+                    heroText.innerHTML += originalText.charAt(charIndex);
+                    charIndex++;
+                    setTimeout(typeWriter, 30);
+                }
+            }
+            
+            setTimeout(typeWriter, 1000);
+            
+            // Add current date to footer
+            const date = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            const dateString = date.toLocaleDateString('en-US', options);
+            
+            const dateElement = document.createElement('p');
+            dateElement.style.cssText = 'opacity: 0.6; font-size: 0.9rem; margin-top: 1rem;';
+            dateElement.innerHTML = `<i class="fas fa-clock"></i> SYSTEM TIME: ${dateString}`;
+            document.querySelector('footer').appendChild(dateElement);
+        });
+
+        // --- CONSOLE LOG INITIALIZATION ---
+        console.log('%c> SYSTEM INITIALIZED', 'color: #00f3ff; font-size: 16px; font-weight: bold;');
+        console.log('%c> 3D Holographic Interface v3.0 Active', 'color: #ff00ff;');
+        console.log('%c> Neural Connection Established', 'color: #00ff9d;');
+        console.log('%c> Welcome to the Digital Realm, Kishan', 'color: #ffd700;');
+    </script>
+</body>
+</html>
